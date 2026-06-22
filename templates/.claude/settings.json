@@ -1,0 +1,23 @@
+{
+  "$comment": "共通ハーネスの settings 原本（テンプレ）。各リポへコピーし、lint/typecheck のコマンドだけ各リポで埋める。JSONはコメント不可のため説明は templates/.claude/README.md を参照。",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+        "hooks": [
+          { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/scope-guard.mjs\"" },
+          { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/decision-reminder.mjs\"" },
+          { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/memory-guard.mjs\"" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "echo '[stop] フル検査をここに配線（例: npm run -s typecheck && npm run -s lint）。各リポの settings.json で上書き。'" }
+        ]
+      }
+    ]
+  }
+}

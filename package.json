@@ -1,0 +1,11 @@
+{
+  "name": "@jyansou/docs-hub",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "横断SoT。コードは持たず、決定・設計・共通ハーネス部品の原本を集約する。",
+  "scripts": {
+    "gen:index": "node scripts/gen-decisions-index.mjs",
+    "check": "node scripts/gen-decisions-index.mjs --check && node scripts/check-structure.mjs"
+  }
+}
