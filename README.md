@@ -1,6 +1,25 @@
 # docs-hub — 横断SoT（単一の真実源）
 
-このリポは**コードを持たない**。複数リポにまたがる知識（設計・契約・決定記録）と、各リポへ配る共通ハーネス部品の**唯一原本**を集約する。
+このリポは**コードを持たない**。複数リポにまたがる知識（設計・契約・決定記録）と、各リポへ配る共通ハーネス部品の**唯一原本**を集約する。ワークスペース全体の地図もここが持つ。
+
+## ワークスペースの並べ方（独立リポ・横並び）
+
+このプロジェクトは独立した GitHub リポジトリの集合。**親はただのディレクトリ**で、git リポジトリにはしない（[ADR-0008](docs/decisions/0008-git-topology.md)）。`web` は `../core` を相対参照するため、3リポを**同じ親ディレクトリ直下に同名で** clone する。
+
+```bash
+mkdir jyansou && cd jyansou        # 親はただの入れ物（git init しない）
+git clone git@github.com:kkwinter73/jyansou-docs-hub.git docs-hub
+git clone git@github.com:kkwinter73/jyansou-core.git      core
+git clone git@github.com:kkwinter73/jyansou-web.git       web
+```
+
+| リポ | GitHub | 役割 |
+|---|---|---|
+| docs-hub | [jyansou-docs-hub](https://github.com/kkwinter73/jyansou-docs-hub) | 横断SoT（このリポ） |
+| core | [jyansou-core](https://github.com/kkwinter73/jyansou-core) | 麻雀エンジン（純粋ロジック） |
+| web | [jyansou-web](https://github.com/kkwinter73/jyansou-web) | ブラウザフロント（React+Vite） |
+
+将来追加候補（未作成）: `server/`, `e2e/`。
 
 ## 中身
 

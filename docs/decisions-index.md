@@ -24,4 +24,4 @@
 | [0005](decisions/0005-one-session-one-repo.md) | 1セッション = 1担当リポ制を採用する | Accepted |
 | [0006](decisions/0006-immutable-state-reducer.md) | ゲーム状態は不変データ + 遷移関数（reducer）で表現する | Accepted |
 | [0007](decisions/0007-seedable-prng.md) | 牌山シャッフル等の乱数は seed 可能な決定論的PRNGを使う | Accepted |
-| [0008](decisions/0008-git-topology.md) | git topology — 各サブリポを独立 git リポにし、親はワークスペース | Accepted |
+| [0008](decisions/0008-git-topology.md) | git topology — 各サブリポを独立 git リポにし、親はただのディレクトリ | Accepted |
