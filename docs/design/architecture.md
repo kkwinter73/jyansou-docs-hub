@@ -28,19 +28,32 @@
 
 ## core の公開API（境界の契約）
 
-`web`/`server` は `core` の**この入口だけ**を使う（内部表現に依存しない）:
+`web`/`server` は `core` の**この入口だけ**を使う（内部表現に依存しない）。すべて `core/src/index.ts` から export。
 
-- 型: `GameState`, `Action`, `GameEvent`, `Tile`, `Meld`, `WinResult`
-- 関数:
-  - `createGame(config, seed): GameState` — 配牌済み初期状態
+- 型: `GameState`, `Action`, `GameEvent`, `GameResult`, `Phase`, `PendingCall`, `Tile`, `Meld`, `PlayerState`, `WinResult`, `RankEntry`, `NextHand`, `RuleConfig`
+- 局進行:
+  - `createGame(seed, rule?): GameState` — 配牌済み初期状態（東1局・親=席0・25000持ち）
   - `legalActions(state, seat): Action[]` — その席が今打てる合法手
   - `apply(state, action): { state, events }` — 状態遷移（不変、[ADR-0006](../decisions/0006-immutable-state-reducer.md)）
-  - `evaluateWin(hand, melds, winTile, context): WinResult | null` — 役・符・点数（Phase 2-3）
+  - `startNextHand(state): NextHand` — 局終了後に次局を配る／終局なら順位
+  - `finalRanking(state): RankEntry[]` / `seatWindOf(state, seat): Wind`
+- 判定（純粋関数。単体でも使える）:
+  - `evaluateWin(input: WinInput): WinResult | null` — 役・符・点数（点の動き込み）
+  - `isWinningHand` / `waits` / `isTenpai` / `shanten(counts, melds?)`
+- CPU: `chooseAction(state, seat): Action`
 - 設計詳細: [core-domain-design](core-domain-design.md), [game-flow-design](game-flow-design.md), [yaku-scoring-design](yaku-scoring-design.md)
 
 ## CPU（対戦相手AI）の置き場所
 
-CPUの思考は**ルールではなく戦略**なので `core` の必須APIには入れない。`legalActions` が返す合法手から1つ選ぶ純粋関数 `chooseAction(state, seat): Action` として、`core` 内の独立モジュール（`core/src/ai/`）に置く。`web` がターン制御の中で呼ぶ。強さの差し替え（ランダム/ベタオリ/向聴ベース）はこの関数の実装差で表現する。
+CPUの思考は**ルールではなく戦略**なので `core` の必須APIとは分離し、`core/src/ai.ts` の純粋関数 `chooseAction(state, seat): Action` に置く（`legalActions` が返す合法手から1つ選ぶ）。`web` がターン制御の中で呼ぶ。強さの差し替えはこの関数の実装差で表現する。
+
+現行実装（v1）: 打牌は**向聴数（`shanten.ts`）最小化**、聴牌でリーチ/受け入れ最大、他家リーチ時は**現物優先のベタオリ**、役牌/タンヤオの鳴き。
+
+## 実装状況（2026-06）
+
+- `core`: 牌・PRNG・和了/役/符/点数・局進行（鳴き・リーチ・各種流局・流し満貫・送り槓）・CPU まで実装済み。
+- `web`: React UI 実装済み（人間=席0、CPU=席1-3）。
+- `server` と射影関数 `viewFor(state, seat)`（他家手牌を伏せる）は**未実装**（オンライン化時に追加）。
 
 ## 状態同期モデル（オンライン化の布石）
 

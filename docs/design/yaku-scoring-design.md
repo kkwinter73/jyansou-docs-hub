@@ -5,6 +5,8 @@
 
 ここは**規則量が多くバグの温床**なので、実装は「単一の表＋テスト表」で管理する。決定記録（ADR）には載せず、ここを唯一の参照源とする（[記録は薄く保つ](../dev-environment/guards.md)）。
 
+> 実装状況: `evaluateWin(input): WinResult | null` 実装済み（`core/src/{yaku,fu,score}.ts`）。役・ドラ集計・符・点数・支払い・本場・供託まで含み、**全分解×待ち解釈を基本点で高点法選択**する。本表の役・符・点数はテスト（`core/tests/{yaku,scoring}.test.ts`）で固定。`WinInput` の実フィールドは `core/src/yaku.ts` を参照（下記の `WinContext` は設計上の説明用）。
+
 ## 評価の入口
 
 ```ts

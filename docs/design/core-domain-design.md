@@ -60,9 +60,8 @@ interface HandState {
 type MeldType = 'chi' | 'pon' | 'ankan' | 'minkan' | 'kakan';
 interface Meld {
   type: MeldType;
-  tiles: Tile[];        // 構成牌（chi/pon=3, kan=4）
+  tiles: Tile[];        // 構成牌（chi/pon=3, kan=4）。順序ソート済み
   from: Seat | null;    // 鳴いた相手の席（ankan は null）
-  calledTile: Tile | null; // 鳴いた牌（どの牌を取ったか）
 }
 ```
 
@@ -72,32 +71,39 @@ interface Meld {
 
 不変（[ADR-0006](../decisions/0006-immutable-state-reducer.md)）。1つのオブジェクトで局を完全に表す。
 
+不変・**フラット構造**（席別の値は長さ4の配列、添字＝席）。実装は `core/src/game.ts`。
+
 ```ts
 type Seat = 0 | 1 | 2 | 3;          // 起家からの相対席
 type Wind = 'E' | 'S' | 'W' | 'N';
+type Phase = 'draw' | 'discard' | 'afterDiscard' | 'afterKakan' | 'over';
+interface PlayerState { concealed: Tile[]; melds: Meld[] }
 
 interface GameState {
-  rule: RuleConfig;                 // 喰タン/赤ドラ枚数/持点/返し点 等（ADR-0004）
-  rng: RngState;                    // seed可能PRNGの内部状態（ADR-0007）
-  round: { wind: Wind; dealer: Seat; honba: number; riichiSticks: number };
-  wall: {
-    tiles: Tile[];                  // 残り山（ツモる順）
-    deadWall: Tile[];               // 王牌14枚
-    doraIndicators: Tile[];         // 表ドラ表示牌（カンで増える）
-    uraIndicators: Tile[];          // 裏ドラ（リーチ和了時のみ公開）
-    kanCount: number;
-  };
-  hands: Record<Seat, HandState>;
-  discards: Record<Seat, Tile[]>;   // 河（捨て牌、順序＝フリテン/一発/海底判定に使う）
-  riichi: Record<Seat, { declared: boolean; ippatsu: boolean; turn: number }>;
-  scores: Record<Seat, number>;
-  turn: Seat;                       // 現在手番
-  phase: 'draw' | 'discard' | 'call' | 'end'; // 局内フェーズ
-  pendingCalls?: PendingCall[];     // 打牌に対する鳴き/ロンの待ち
+  rule: RuleConfig; rng: RngState;  // ADR-0004 / 0007
+  wind: Wind; dealer: Seat; honba: number; riichiSticks: number; // 場況
+  wall: Tile[];                     // シャッフル済み全136牌
+  liveEnd: number;                  // 生牌の終端（カンごとに減る。王牌=wall[122..]）
+  drawIndex: number;                // 次にツモる生牌の位置
+  doraIndicators: Tile[]; uraIndicators: Tile[]; // カンで増える
+  kanCount: number; kansBySeat: number[];        // 四槓散了判定
+  rinshanDrawn: number; rinshan: boolean;        // 嶺上の管理（嶺上開花）
+  hands: PlayerState[];             // [4]
+  discards: Tile[][];               // [4] 河（フリテン/海底判定）
+  riichi: boolean[]; ippatsu: boolean[];         // [4]
+  tempFuriten: boolean[]; riichiFuriten: boolean[]; // [4] フリテン管理
+  discardCalledFrom: boolean[];     // [4] 流し満貫判定（鳴かれたか）
+  scores: number[];                 // [4]
+  turn: Seat; phase: Phase; drawnTile: Tile | null;
+  lastDiscard: { seat: Seat; tile: Tile } | null;
+  pendingCalls: PendingCall[]; callResponses: Record<number, Action>; // 鳴き解決
+  chankanTile: Tile | null;         // 加槓のチャンカン待ち牌
+  kuikae: TileKind[];               // 喰い替えで打てない種（鳴き直後の1打）
+  result: GameResult | null;
 }
 ```
 
-字牌の役牌（自風・場風・三元）は `round.wind` と各席の自風から導出する。
+字牌の役牌（自風・場風・三元）は `wind`（場風）と各席の自風（`seatWindOf`）から導出する。
 
 ## 5. PRNG（決定論乱数）
 
@@ -108,7 +114,7 @@ function shuffle<T>(rng: RngState, xs: T[]): { rng: RngState; result: T[] }; // 
 ```
 
 - `rng` は `GameState` に内包し、`apply` を通じてのみ進む。これで「同じ初期stateとactionの列 → 同じ展開」が保証される（[ADR-0007](../decisions/0007-seedable-prng.md)）。
-- seed の**生成**は `core` の外（`web`が `Date.now()`/crypto で作って `createGame(config, seed)` に渡す）。
+- seed の**生成**は `core` の外（`web`が `Date.now()`/crypto で作って `createGame(seed, rule?)` に渡す）。
 
 ## 6. 和了形判定アルゴリズム（Phase 1 の中核）
 
@@ -126,6 +132,6 @@ function shuffle<T>(rng: RngState, xs: T[]): { rng: RngState; result: T[] }; // 
 么九牌13種がすべて1枚以上 + いずれか1種が2枚。
 
 ### 聴牌・待ち列挙
-`Counts`(13枚相当) に対し、34種すべてを1枚加えて (a)(b)(c) のいずれかになる種を集める ＝ 待ち。`isTenpai = waits.length > 0`。フリテンは「自分の待ちのいずれかが自分の河にある」で判定。向聴数（shanten）は CPU 用に別途計算（Phase で追加）。
+`Counts`(13枚相当) に対し、34種すべてを1枚加えて (a)(b)(c) のいずれかになる種を集める ＝ 待ち。`isTenpai = waits.length > 0`。フリテンは「自分の待ちのいずれかが自分の河にある」で判定。**向聴数 `shanten(counts, melds)`**（標準形/七対子/国士の最小、-1=和了・0=聴牌）は `core/src/shanten.ts` に実装し、CPUの打牌選択（[architecture](architecture.md#cpu対戦相手aiの置き場所)）が使う。
 
 > 役・符・点数の設計は [yaku-scoring-design](yaku-scoring-design.md)、局の進行（鳴き・リーチ・流局）は [game-flow-design](game-flow-design.md) を参照。
